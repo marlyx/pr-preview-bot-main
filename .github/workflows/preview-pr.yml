@@ -9,6 +9,9 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  ARTIFACT_NAME: preview-pr-${{ github.event.number }}
+
 concurrency:
   group: preview-pr-${{ github.event.number }}
   cancel-in-progress: true
@@ -35,12 +38,31 @@ jobs:
 
       - name: build
         run: mkdocs build -d _site
+      
+      - name: delete previous artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: "${{ env.ARTIFACT_NAME }}",
+            });
+            
+            for (const artifact of artifacts.data.artifacts) {
+              console.log(`Deleting artifact ${artifact.id} (${artifact.name})`);
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }
 
       - name: upload
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: "preview-pr-${{ github.event.number }}"
+          name: ${{ env.ARTIFACT_NAME }}
           path: "_site"
           retention-days: 2
           overwrite: true
